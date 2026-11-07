@@ -20,8 +20,9 @@ data class DiscussionState(val running: Boolean = false, val stopping: Boolean =
     val turns: List<DiscussionTurn> = emptyList(), val status: String = "Ready",
     val error: String? = null, val activeAgent: String? = null)
 
-class RoundtableViewModel : ViewModel() {
-    private val client = OllamaClient()
+class RoundtableViewModel(
+    private val backend: RoundtableBackend = OllamaRoundtableBackend()
+) : ViewModel() {
     private val mutable = MutableStateFlow(DiscussionState())
     val state = mutable.asStateFlow()
     private var job: Job? = null
@@ -40,7 +41,7 @@ class RoundtableViewModel : ViewModel() {
         val snapshot: List<LocalAgentSpec>
         val base = endpoint.trim()
         try {
-            client.validateEndpoint(base)
+            backend.validateEndpoint(base)
             require(topic.isNotBlank() && topic.length <= 16000) { "Topic must contain 1-16000 characters" }
             snapshot = LocalAgentRoster.validate(agents)
         } catch (e: Exception) {
@@ -57,7 +58,7 @@ class RoundtableViewModel : ViewModel() {
                     mutable.value = mutable.value.copy(activeAgent = agent.name,
                         status = "Turn ${index + 1}/${snapshot.size}: ${agent.name}")
                     val turn = try {
-                        val response = client.chat(base, agent.model,
+                        val response = backend.chat(base, agent.model,
                             "Discussion role: ${agent.name}\nTopic: $runTopic", prior)
                         currentCoroutineContext().ensureActive()
                         val parsed = SspParser.parse(response.text)
@@ -71,24 +72,27 @@ class RoundtableViewModel : ViewModel() {
                     }
                     currentCoroutineContext().ensureActive()
                     mutable.value = mutable.value.copy(turns = mutable.value.turns + turn)
-                    // Only the latest successful response becomes peer context.
                     if (turn.isSuccess) prior = turn.text
                 }
                 val failures = mutable.value.turns.count { !it.isSuccess }
                 mutable.value = mutable.value.copy(status =
                     "Completed with $failures failed request(s); model agreement is not verification")
             } catch (e: CancellationException) {
-                mutable.value = mutable.value.copy(status = "Cancelled")
                 throw e
             } catch (e: Exception) {
                 mutable.value = mutable.value.copy(status = "Roundtable failed; no cloud fallback",
                     error = e.message ?: "Session error")
-            } finally {
-                mutable.value = mutable.value.copy(running = false, stopping = false, activeAgent = null)
-                job = null
             }
         }
         job = task
+        // Unlike body-only finally, this also runs when cancelled before the body starts.
+        task.invokeOnCompletion { cause ->
+            if (job === task) {
+                job = null
+                mutable.value = mutable.value.copy(running = false, stopping = false, activeAgent = null,
+                    status = if (cause is CancellationException) "Cancelled" else mutable.value.status)
+            }
+        }
         task.start()
     }
 
@@ -101,7 +105,6 @@ class RoundtableViewModel : ViewModel() {
 
     override fun onCleared() {
         job?.cancel()
-        client.close()
-        super.onCleared()
+        try { backend.close() } finally { super.onCleared() }
     }
 }
