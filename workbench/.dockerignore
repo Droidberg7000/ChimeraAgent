@@ -1,0 +1,13 @@
+.git
+.venv
+.chimera
+workspace
+__pycache__
+*.pyc
+.env
+.env.*
+*.pem
+*.key
+node_modules
+tests
+docs

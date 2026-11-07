@@ -1,0 +1,8 @@
+.venv/
+.chimera/
+workspace/
+__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example
