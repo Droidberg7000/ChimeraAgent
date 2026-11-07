@@ -1,25 +1,20 @@
 # Roundtable ViewModel JVM tests
 
-RoundtableViewModelTest defines twenty JUnit tests executed on the JVM with kotlinx-coroutines-test 1.9.0 and the existing real JVM org.json test dependency. No emulator, Android device, Ollama, API key or network is used. Production parsing is not mocked: successful fake replies pass through the shared SspParser.
+RoundtableViewModelTest retains the original twenty orchestration tests. RoundtableConcurrencyTest adds twelve lifecycle, ownership and coordination tests. MainDispatcherRule and kotlinx-coroutines-test 1.9.0 provide controlled scheduling; the concurrency suite also uses bounded worker-thread/barrier joins to exercise actual concurrent control calls. No Thread.sleep, emulator, Ollama, API key or network is used.
 
-The ViewModel now accepts RoundtableBackend with a production default OllamaRoundtableBackend adapter. The existing no-argument production construction and public start/startAgents/stop methods remain available. The adapter delegates unchanged to OllamaClient's existing validation, HTTP/cancellation behavior and close operation; no networking policy is relaxed.
+The real ViewModel and shared SspParser execute against fake RoundtableBackend implementations. The production default remains a private-client OllamaRoundtableBackend, with no-argument ViewModel construction preserved. Existing parser, UI and endpoint-policy tests remain separate.
 
-A JUnit MainDispatcherRule replaces Main with StandardTestDispatcher, and runTest uses the same scheduler. Tests advance that scheduler without Thread.sleep or real delays. Each fixture owns a ViewModelStore and clears it after the test. Store clearing verifies actual onCleared resource cleanup.
+All job references, cleared/ownership flags, run-token checks and read-copy-write state transitions are protected by one gate. Validation is outside the gate and eligibility is rechecked before reservation. Coroutine/backend execution, cancellation and resource closing occur outside that gate. Completion callbacks use the same gate, including inline completion on a worker and cancellation before body entry. Old run tokens cannot publish into a cleared or different run.
 
-Coverage: initial idle state; invalid topics, rosters and endpoints; compatibility turn-count limits; ordered agent calls and prior-success handoff; actual/requested model attribution; real SSP parsing and raw fallback; peer failures and continuation; duplicate-start prevention; cancellation before the job body runs; in-flight cancellation; retaining prior completed turns; propagating cancellation instead of creating failure turns; restart after stop; roster snapshot isolation; store-clear cancellation and exactly-once backend closure; compatibility API delegation; fresh-run state reset; observable active speaker; idle Stop.
+BackendOwnership.OWNED (default) means exclusive ownership transfer; never share such a backend. BORROWED means the external owner closes it after all users finish. ViewModel clearing cancels only that ViewModel's job and does not close borrowed backends. An owned backend closes once, after the active job and its cancellation cleanup complete. Ordinary close failures are recorded instead of escaping completion callbacks. See COROUTINES.md for contracts and limits.
 
-Cancellation cleanup moved from body-only finally to an identity-guarded job completion handler. That handler also runs if cancellation happens before the queued coroutine body begins, preventing a stuck running/stopping UI. An old completed job cannot clear a different run's job reference. This is an intentional small production change with explicit regression coverage.
+Coverage added: clear before queued body; background Stop; simultaneous starts; calls after clearing; borrowed/shared backend lifetimes; deferred owned shutdown; cancellation during validation; close failures; inline cancelled-scope completion; dropping late responses; no-argument constructor presence. The constructor test checks reflection only, not real Android factory instantiation.
 
-From android/, with JDK 17, installed Gradle 8.9 and the configured Android SDK:
+From android/, with the documented SDK/JDK/Gradle setup:
 
 ```sh
-# Only the new ViewModel suite.
-gradle :app:testDebugUnitTest --tests 'com.chimera.agent.RoundtableViewModelTest'
-
-# All app JVM tests plus the separate shared parser tests.
+gradle :app:testDebugUnitTest --tests 'com.chimera.agent.RoundtableViewModelTest' --tests 'com.chimera.agent.RoundtableConcurrencyTest'
 gradle :app:testDebugUnitTest :parser:test
 ```
 
-Reports: app/build/reports/tests/testDebugUnitTest/ and app/build/test-results/testDebugUnitTest/. Existing android-build CI already invokes :app:testDebugUnitTest, so no workflow modification is needed.
-
-Defined tests are not execution results. The authoring environment has no Java/Kotlin/Gradle/Android SDK, so this revision has not been compiled or executed here. Fake-backend cancellation does not prove real socket cancellation, device lifecycle behavior or live server behavior; those require transport/device integration tests. The endpoint validator itself remains covered by separate endpoint-policy tests.
+The existing Android CI invokes :app:testDebugUnitTest. Defined tests are not passing execution results: no Java/Kotlin/Gradle/Android SDK is available in the authoring environment. Transport cancellation, a real default factory, actual Compose lifecycle and device behavior still require integration tests. No compile or runtime success is claimed from source checks.
