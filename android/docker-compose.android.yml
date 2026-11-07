@@ -1,0 +1,5 @@
+# Use with workbench/docker-compose.yml only when Android needs direct Ollama access.
+services:
+  ollama:
+    ports:
+      - "127.0.0.1:11434:11434"

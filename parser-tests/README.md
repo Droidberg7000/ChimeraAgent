@@ -1,9 +1,9 @@
-# Isolated SSP parser tests
+# Shared SSP parser and JVM tests
 
-This project compiles the repaired parser and runs the six supplied JUnit tests on a JVM. It does NOT integrate the Android app, router, modem tools, Firebase, or Compose UI. The parser is copied unchanged from the standalone review bundle.
+The source in src/main/kotlin/com/example/ai/SspParser.kt is the single production parser. The Android build includes this directory's Gradle project as :parser and the app depends on it. No second parser copy is maintained.
 
-CI uses JDK 17, Gradle 8.8, Kotlin 2.0.21, JUnit 4.13.2, and org.json 20240303. The JSON dependency is the JVM implementation; passing does not establish identical behavior on Android's bundled org.json. Android device/instrumentation tests remain separate.
+The org.json dependency is compileOnly. JVM tests use org.json 20240303; Android uses the platform implementation, without packaging the JVM org.json jar. Six JUnit tests remain under src/test/kotlin. The Android app's androidTest source set reuses those exact six tests for device/emulator execution.
 
-With JDK 17 and Gradle 8.8 installed: `gradle --no-daemon clean test`. No Gradle wrapper binary is supplied. Dependency and tool downloads require network access.
+Standalone JVM checks: JDK 17 and Gradle 8.8, then `gradle --no-daemon clean test`. Android build: from ../android with Gradle 8.9, `gradle :parser:test :app:testDebugUnitTest :app:assembleDebug`. For the Android JSON implementation, connect a device/emulator and run `gradle :app:connectedDebugAndroidTest`.
 
-Workflow: .github/workflows/parser-tests.yml. A matching push runs tests on GitHub Actions if Actions is enabled and quota/policy permits. Results appear in the job summary, test logs, and uploaded XML/HTML reports. Infrastructure or dependency failures are not test passes. No execution result is claimed before the workflow completes.
+Tool/dependency downloads require internet. No Gradle wrapper binary is supplied. CI results must be inspected; no passing run is claimed merely because a workflow was committed. Android, network, UI, and device behavior are not certified by JVM parser tests.

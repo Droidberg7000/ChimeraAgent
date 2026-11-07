@@ -7,7 +7,9 @@ repositories { mavenCentral() }
 kotlin { jvmToolchain(17) }
 
 dependencies {
-    implementation("org.json:json:20240303")
+    // Android supplies org.json; do not package a second implementation in the APK.
+    compileOnly("org.json:json:20240303")
+    testImplementation("org.json:json:20240303")
     testImplementation("junit:junit:4.13.2")
 }
 
