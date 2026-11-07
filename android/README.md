@@ -1,49 +1,61 @@
 # Chimera Android app module
 
-A new, separate Gradle Android application in ChimeraAgent. This is a local-Ollama client, not a WebView, and not a port of unverified cloud/modem tools. The Python workbench remains separate. main is not modified by this branch commit.
+Native Compose local-Ollama client inside ChimeraAgent. MainActivity launches MultiAgentRoundtableStudio.kt; the old RoundtableScreen entry point remains as a compatibility delegate. The Python workbench and main branch are not changed.
 
-## Parser integration
+## Roundtable
 
-The app depends on :parser, mapped to ../parser-tests. RoundtableViewModel imports com.example.ai.SspParser and parses real Ollama replies. Invalid structured output remains visible as raw text. Agreement scores remain unverified. There is one parser implementation, not a copied Android fork. Existing six JVM tests compile that production implementation. The same six tests are also included in Android instrumentation sources to check the actual platform org.json.
+Enter a topic, a trusted local Ollama endpoint, and one Agent name=model:tag per line. Example:
 
-## Build
-
-Pinned baseline: JDK 17, Gradle 8.9, Android Gradle Plugin 8.7.3, Kotlin/Compose compiler plugin 2.0.21, compile/target SDK 35, min SDK 26. These are explicit baseline versions, not a claim of latest releases. Install Android SDK platform 35 and build tools 34.0.0. Open this android/ directory in Android Studio, or use an installed Gradle 8.9:
-
-```sh
-gradle :parser:test :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest
+```text
+Architect=qwen3:4b
+Auditor=llama3.2:latest
+Synthesizer=qwen3:4b
 ```
 
-Debug APK: app/build/outputs/apk/debug/app-debug.apk. Connected device/emulator parser tests:
+All chosen models must already be downloaded. One to five uniquely named agents run sequentially. The default roster repeats qwen3:4b in three roles so it works with the previously configured model; repeated models are explicitly not independent verification. Different installed model tags are supported. There are no cloud providers, API keys or automatic fallbacks.
+
+Each turn displays the agent name, requested model, actual model reported by Ollama, structured/raw status, and unverified agreement score. Failed requests stay visible, do not become peer evidence, and do not prevent later agents from attempting their configured model. Each agent receives the topic and the latest successful response, not a full debate transcript. Stop cancels the coroutine and OkHttp call; back through the screen's Back button also requests cancellation. Backgrounding is not guaranteed to stop a run. No automatic audio, modem/MEP tools, kernel claims, or private chain-of-thought collection is included.
+
+## Shared parser
+
+The app depends on :parser mapped to ../parser-tests. There is one SspParser implementation used by the real response handler and the six JVM tests. Invalid SSP output remains raw text, never a fabricated score. Android instrumentation sources reuse the same six tests against Android's org.json. The JVM org.json library is compileOnly plus testImplementation, not an APK runtime dependency.
+
+## Build and test
+
+Baseline: JDK 17, Gradle 8.9, AGP 8.7.3, Kotlin/Compose compiler plugin 2.0.21, Android SDK 35, build tools 34.0.0, minimum API 26. Open android/ in Android Studio or, with the SDK and Gradle installed, run from android/:
+
+```sh
+gradle :parser:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
+```
+
+App APK: app/build/outputs/apk/debug/app-debug.apk. A device/emulator is required to actually execute instrumentation tests:
 
 ```sh
 gradle :app:connectedDebugAndroidTest
 ```
 
-No wrapper JAR or generated binary is committed. You need installed Gradle 8.9; generate a wrapper locally with `gradle wrapper --gradle-version 8.9` if desired. First sync/build downloads dependencies.
+No Gradle wrapper JAR is committed. Generate one locally with Gradle 8.9 if needed. Roster unit tests cover parsing, repeated models, invalid/cloud/routed tags and the five-agent limit; endpoint and parser tests remain separate.
 
-## Connect to Ollama
+## Local connection
 
-The app connects directly to Ollama /api/chat, not the Python workbench API. It does not manage workbench tools, sessions, approvals or backups. Run Ollama on your development computer, download qwen3:4b (or another suitable local model), then for an adb-connected Android device/emulator:
+The app calls Ollama /api/chat directly, not the Python workbench API. For a local Ollama service and an adb-connected device/emulator:
 
 ```sh
 adb reverse tcp:11434 tcp:11434
 ```
 
-Keep the default app URL http://127.0.0.1:11434/. In the standard Android emulator, http://10.0.2.2:11434/ is an alternative host-loopback route. The original Compose stack does not publish Ollama. To use it with adb reverse, from workbench/ explicitly add the Android loopback-port override:
+Use the default http://127.0.0.1:11434/ app endpoint. The standard Android emulator also supports http://10.0.2.2:11434/ for host loopback access. With the existing Docker stack, publish Ollama only on host loopback using this command from workbench/:
 
 ```sh
 docker compose -f docker-compose.yml -f ../android/docker-compose.android.yml up -d --build
 ```
 
-Add your NVIDIA/AMD override as another -f argument when needed. No LAN/public Ollama port is published by this override.
+Add the NVIDIA/AMD override when appropriate. Download additional models with `docker compose exec ollama ollama pull MODEL` using your stack's same Compose file arguments.
 
-Debug builds permit cleartext only for localhost, 127.0.0.1 and 10.0.2.2. Private LAN IPv4 endpoints require HTTPS with a normally trusted certificate unless you deliberately change debug policy. Release builds disallow cleartext. There is no trust-all TLS handler. The client rejects public endpoints, embedded credentials, paths, redirects and obvious cloud model tags. This is an endpoint policy, not proof of air-gap isolation: a private Ollama server can itself route elsewhere. Do not send secrets to an untrusted endpoint.
+Debug cleartext is restricted to localhost, 127.0.0.1 and 10.0.2.2. Private LAN endpoints require trusted HTTPS unless debug policy is deliberately changed. Release builds disallow cleartext. Client redirects/proxy routing/public hosts/embedded credentials are disabled. A private server can itself route elsewhere; endpoint policy and cloud-tag rejection are not proof of offline inference. Only use a server you trust.
 
-## Behavior and boundaries
+## Scope and verification
 
-Start makes three sequential calls to the same selected local model, carrying the previous reply forward as untrusted context. It is not advertised as multiple independent agents or verification. Stop cancels the coroutine and underlying OkHttp call; it does not undo server processing or unload the model. State survives rotation through ViewModel but is not persisted to disk and is lost on process death. Leaving the app in the background does not necessarily stop it; press Stop explicitly. Inference is non-streaming in this initial Android client. Responses are capped at 256 KB; prompts at 16000 characters. No automatic fallback, Firebase, API keys, modem commands, unlock calculation or audio playback is included.
+This is a local multi-model discussion UI, not cloud-provider fusion, independent fact checking, or the Python tool-agent frontend. Responses are non-streaming, bounded to 256 KB; topics to 16000 characters. ViewModel state survives rotation but not process death; no disk chat persistence is implemented. Server work already started is not rolled back by cancellation.
 
-## Validation status
-
-Authoring environment has no Java/Kotlin/Gradle/Android SDK. Source/XML checks are not a build. The android-build workflow installs tools, runs JVM tests and lint, compiles app and instrumentation APKs, and uploads reports/APKs. It does NOT run an emulator. Device tests require the connectedDebugAndroidTest command above. Inspect actual CI results before treating the app as built or tested. No APK, live model, emulator, hardware or parser runtime success is claimed in advance.
+Authoring environment has no Android/Kotlin toolchain. Source checks are not compilation. The existing Android CI workflow tests JVM code, runs lint and builds app/instrumentation APKs; it does not run an emulator. A passing build/test result, working APK, live model or device behavior is not claimed until actual results are inspected.
