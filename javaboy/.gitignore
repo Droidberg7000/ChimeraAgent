@@ -1,0 +1,8 @@
+build/
+__pycache__/
+*.cod
+*.jar
+*.bin
+*.gb
+*.gbc
+*.gba

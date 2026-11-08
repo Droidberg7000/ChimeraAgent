@@ -1,0 +1,11 @@
+{
+  "javascript_tests_passed": 7,
+  "build_missing_sdk_guard": "passed",
+  "build_missing_backend_guard": "passed",
+  "packaging_metadata_and_sibling_extraction": "passed using synthetic unit fixtures; not real COD execution",
+  "java_portable_tests": "supplied for CI; NOT RUN here (no Java/Javac)",
+  "sdk_compile_signing_device_playback": "NOT RUN",
+  "diagnostics": "implemented source, NOT hardware verified",
+  "emulator_engines": "NOT SUPPLIED; never claim ROM playback",
+  "publication": "pre-commit preparation snapshot"
+}
