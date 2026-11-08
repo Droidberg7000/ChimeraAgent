@@ -1,0 +1,22 @@
+{
+  "static_source_checks": {
+    "incremental_input": true,
+    "no_feed_splitting": true,
+    "bounded_line": true,
+    "no_toByteArray": true,
+    "cache_identity": true,
+    "coalesced_result": true,
+    "cleanup_admission": true,
+    "visibility_ack": true,
+    "wait_before_start": true,
+    "gateway_clear": true,
+    "visible_validation": true,
+    "owned_event_check": true,
+    "cache_off_ui": true
+  },
+  "java_unit_tests": "NOT RUN: no Java/Javac",
+  "midlet_compile": "NOT RUN: no Java ME SDK/preverify",
+  "device_playback": "NOT RUN",
+  "gateway_changes": "not included in this client-only revision",
+  "github_changes": "not yet committed"
+}
