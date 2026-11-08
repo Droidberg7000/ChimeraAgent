@@ -1,0 +1,21 @@
+services:
+  gateway:
+    build: .
+    image: chimeratube:local
+    restart: unless-stopped
+    environment:
+      INVIDIOUS_ORIGIN: '${INVIDIOUS_ORIGIN:-}'
+    ports:
+      - '${GATEWAY_BIND:-127.0.0.1}:9090:9090'
+    volumes:
+      - media:/media
+      - ./imports:/imports:ro
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=256m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 128
+    mem_limit: 1g
+volumes:
+  media:

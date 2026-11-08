@@ -1,0 +1,9 @@
+client
+build
+dist
+media
+imports
+.env
+.env.*
+__pycache__
+*.pyc

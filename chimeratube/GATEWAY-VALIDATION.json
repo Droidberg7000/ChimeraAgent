@@ -1,0 +1,11 @@
+{
+  "gateway_tests_executed": 14,
+  "gateway_tests_passed": 14,
+  "gateway_tests_skipped": 0,
+  "real_localhost_http": true,
+  "real_ffmpeg_preparation": true,
+  "invidious": "fixtures only; not live-tested",
+  "docker_build": "NOT RUN",
+  "java_midp_device_tests": "NOT RUN",
+  "publication": "pre-commit preparation snapshot"
+}
